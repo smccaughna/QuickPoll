@@ -1,0 +1,13 @@
+name: QuickPoll
+version: '${version}'
+main: com.ibakedpotato.quickpoll.QuickPoll
+api-version: '1.20'
+commands:
+  poll:
+    description: Create a poll.
+    usage: /poll
+    permission: quickpoll.poll
+  vote:
+    description: Vote on a poll.
+    usage: /vote [number]
+    permission: quickpoll.vote
