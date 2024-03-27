@@ -8,7 +8,6 @@ public final class QuickPoll extends JavaPlugin {
     public void onEnable() {
         this.getCommand("poll").setExecutor(new CommandPoll());
         this.getCommand("vote").setExecutor(new CommandVote());
-        this.getServer().getPluginManager().registerEvents(new GuiPoll(), this);
     }
 
     @Override
