@@ -1,6 +1,7 @@
 package com.ibakedpotato.quickpoll;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.conversations.*;
 import org.bukkit.entity.Player;
@@ -8,7 +9,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -26,22 +29,22 @@ public class GuiPoll implements Listener, InventoryHolder {
 
     private String pollQuestion             = null;
     private int pollDuration                = 0;
-    private ArrayList<String> pollResponses = new ArrayList<String>();
+    private ArrayList<String> pollResponses = new ArrayList<>();
 
     public GuiPoll() {
-        inventory = Bukkit.createInventory(this, 9, "Create Poll");
-        inventory.addItem(createGuiItem(Material.BLACK_STAINED_GLASS_PANE, ""));
-        inventory.addItem(createGuiItem(Material.WRITABLE_BOOK, "Edit question"));
-        inventory.addItem(createGuiItem(Material.BLACK_STAINED_GLASS_PANE, " "));
-        inventory.addItem(createGuiItem(Material.WRITABLE_BOOK, "Set poll duration"));
-        inventory.addItem(createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "  "));
-        inventory.addItem(createGuiItem(Material.WRITABLE_BOOK, "Add responses"));
-        inventory.addItem(createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "   "));
-        inventory.addItem(createGuiItem(Material.LIME_DYE, "Create poll"));
-        inventory.addItem(createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "    "));
+        this.inventory = Bukkit.createInventory(this, 9, "Create Poll");
+        this.inventory.addItem(this.createGuiItem(Material.BLACK_STAINED_GLASS_PANE, ""));
+        this.inventory.addItem(this.createGuiItem(Material.WRITABLE_BOOK, "Edit question"));
+        this.inventory.addItem(this.createGuiItem(Material.BLACK_STAINED_GLASS_PANE, " "));
+        this.inventory.addItem(this.createGuiItem(Material.WRITABLE_BOOK, "Set poll duration"));
+        this.inventory.addItem(this.createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "  "));
+        this.inventory.addItem(this.createGuiItem(Material.WRITABLE_BOOK, "Add responses"));
+        this.inventory.addItem(this.createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "   "));
+        this.inventory.addItem(this.createGuiItem(Material.LIME_DYE, "Create poll"));
+        this.inventory.addItem(this.createGuiItem(Material.BLACK_STAINED_GLASS_PANE, "    "));
     }
 
-    protected ItemStack createGuiItem(final Material material, final String name, final String... lore) {
+    private ItemStack createGuiItem(final Material material, final String name, final String... lore) {
         final ItemStack item = new ItemStack(material, 1);
         final ItemMeta meta = item.getItemMeta();
 
@@ -55,6 +58,13 @@ public class GuiPoll implements Listener, InventoryHolder {
     @Override
     public @NotNull Inventory getInventory() {
         return this.inventory;
+    }
+
+    public void openInventory(Player player) {
+        HandlerList.unregisterAll(this);
+        player.sendMessage("opening outer listener");
+        JavaPlugin.getPlugin(QuickPoll.class).getServer().getPluginManager().registerEvents(this, JavaPlugin.getPlugin(QuickPoll.class));
+        player.openInventory(this.inventory);
     }
 
     @EventHandler
@@ -72,9 +82,9 @@ public class GuiPoll implements Listener, InventoryHolder {
 
                     ConversationFactory factory = new ConversationFactory(JavaPlugin.getPlugin(QuickPoll.class))
                             .withFirstPrompt(new PromptSetQuestion())
-                            .thatExcludesNonPlayersWithMessage("This command must be used by a player.")
                             .withLocalEcho(true)
-                            .withEscapeSequence("cancel");
+                            .withEscapeSequence("cancel")
+                            .thatExcludesNonPlayersWithMessage("This command must be used by a player.");
 
                     factory.buildConversation(player).begin();
                 } break;
@@ -83,22 +93,19 @@ public class GuiPoll implements Listener, InventoryHolder {
 
                     ConversationFactory factory = new ConversationFactory(JavaPlugin.getPlugin(QuickPoll.class))
                             .withFirstPrompt(new PromptSetDuration())
-                            .thatExcludesNonPlayersWithMessage("This command must be used by a player.")
-                            .withLocalEcho(true);
+                            .withLocalEcho(true)
+                            .withEscapeSequence("cancel")
+                            .thatExcludesNonPlayersWithMessage("This command must be used by a player.");
 
                     factory.buildConversation(player).begin();
                 } break;
                 case "Add responses": {
-                    player.closeInventory();
-
-                    GuiAddResponses guiAddResponses;
-                    JavaPlugin.getPlugin(QuickPoll.class).getServer().getPluginManager().registerEvents(guiAddResponses = new GuiAddResponses(), JavaPlugin.getPlugin(QuickPoll.class));
-
-                    player.openInventory(guiAddResponses.getInventory());
+                    GuiAddResponses guiAddResponses = new GuiAddResponses();
+                    guiAddResponses.openInventory(player);
                 } break;
                 case "Create poll": {
                     HandlerList.unregisterAll(this);
-
+                    player.sendMessage("closing outer listener");
                     player.closeInventory();
                     player.sendMessage("Question: " + GuiPoll.this.pollQuestion + "\nDuration: " + String.valueOf(GuiPoll.this.pollDuration));
                     for (int i = 0; i < GuiPoll.this.pollResponses.size(); i++) {
@@ -110,10 +117,18 @@ public class GuiPoll implements Listener, InventoryHolder {
     }
 
     @EventHandler
-    public void onInventoryClick(final InventoryDragEvent event) {
+    public void onInventoryDrag(final InventoryDragEvent event) {
         if (event.getInventory().getHolder(false) instanceof GuiPoll) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler
+    public void onInventoryClose(final InventoryCloseEvent event) {
+        if (!(event.getInventory().getHolder(false) instanceof GuiPoll)) return;
+
+        event.getPlayer().sendMessage("closing outer listener");
+        HandlerList.unregisterAll(this);
     }
 
     private class PromptSetQuestion extends StringPrompt {
@@ -128,7 +143,7 @@ public class GuiPoll implements Listener, InventoryHolder {
             GuiPoll.this.pollQuestion = str;
 
             Player player = (Player) context.getForWhom();
-            player.openInventory(GuiPoll.this.getInventory());
+            GuiPoll.this.openInventory(player);
 
             return Prompt.END_OF_CONVERSATION;
         }
@@ -146,7 +161,7 @@ public class GuiPoll implements Listener, InventoryHolder {
             GuiPoll.this.pollDuration = (int) number;
 
             Player player = (Player) context.getForWhom();
-            player.openInventory(GuiPoll.this.getInventory());
+            GuiPoll.this.openInventory(player);
 
             return Prompt.END_OF_CONVERSATION;
         }
@@ -157,18 +172,25 @@ public class GuiPoll implements Listener, InventoryHolder {
         private final Inventory inventory;
 
         public GuiAddResponses() {
-            inventory = Bukkit.createInventory(this, 9, "Add Responses");
-            inventory.addItem(GuiPoll.this.createGuiItem(Material.RED_DYE, "Back"));
-            inventory.addItem(GuiPoll.this.createGuiItem(Material.WRITABLE_BOOK, "Add response"));
+            this.inventory = Bukkit.createInventory(this, 9, "Add Responses");
+            this.inventory.addItem(GuiPoll.this.createGuiItem(Material.RED_DYE, "Back"));
+            this.inventory.addItem(GuiPoll.this.createGuiItem(Material.WRITABLE_BOOK, "Add response"));
 
             for (int i = 0; i < GuiPoll.this.pollResponses.size(); i++) {
-                inventory.addItem(GuiPoll.this.createGuiItem(Material.PAPER, GuiPoll.this.pollResponses.get(i), String.valueOf(i + 1)));
+                this.inventory.addItem(GuiPoll.this.createGuiItem(Material.PAPER, GuiPoll.this.pollResponses.get(i), String.valueOf(i + 1)));
             }
         }
 
         @Override
         public @NotNull Inventory getInventory() {
             return this.inventory;
+        }
+
+        public void openInventory(Player player) {
+            HandlerList.unregisterAll(this);
+            player.sendMessage("opening inner listener");
+            JavaPlugin.getPlugin(QuickPoll.class).getServer().getPluginManager().registerEvents(this, JavaPlugin.getPlugin(QuickPoll.class));
+            player.openInventory(this.inventory);
         }
 
         @EventHandler
@@ -182,17 +204,17 @@ public class GuiPoll implements Listener, InventoryHolder {
 
                 switch (event.getCurrentItem().getItemMeta().getDisplayName()) {
                     case "Back": {
-                        HandlerList.unregisterAll(this);
-                        player.openInventory(GuiPoll.this.getInventory());
+                        GuiPoll.this.openInventory(player);
                     } break;
                     case "Add response": {
-                        if (GuiPoll.this.pollResponses.size() <= 7) {
+                        if (GuiPoll.this.pollResponses.size() < 7) {
                             player.closeInventory();
 
                             ConversationFactory factory = new ConversationFactory(JavaPlugin.getPlugin(QuickPoll.class))
                                     .withFirstPrompt(new PromptAddResponse())
-                                    .thatExcludesNonPlayersWithMessage("This command must be used by a player.")
-                                    .withLocalEcho(true);
+                                    .withLocalEcho(true)
+                                    .withEscapeSequence("cancel")
+                                    .thatExcludesNonPlayersWithMessage("This command must be used by a player.");
 
                             factory.buildConversation(player).begin();
                         }
@@ -208,6 +230,19 @@ public class GuiPoll implements Listener, InventoryHolder {
             }
         }
 
+        @EventHandler
+        public void onInventoryOpen(final InventoryOpenEvent event) {
+            JavaPlugin.getPlugin(QuickPoll.class).getServer().getPluginManager().registerEvents(this, JavaPlugin.getPlugin(QuickPoll.class));
+        }
+
+        @EventHandler
+        public void onInventoryClose(final InventoryCloseEvent event) {
+            if (!(event.getInventory().getHolder(false) instanceof GuiAddResponses)) return;
+
+            HandlerList.unregisterAll(this);
+            event.getPlayer().sendMessage("closing inner listener");
+        }
+
         private class PromptAddResponse extends StringPrompt {
 
             @Override
@@ -221,7 +256,7 @@ public class GuiPoll implements Listener, InventoryHolder {
                 GuiAddResponses.this.inventory.addItem(GuiPoll.this.createGuiItem(Material.PAPER, str, String.valueOf(GuiPoll.this.pollResponses.size())));
 
                 Player player = (Player) context.getForWhom();
-                player.openInventory(GuiAddResponses.this.getInventory());
+                GuiAddResponses.this.openInventory(player);
 
                 return Prompt.END_OF_CONVERSATION;
             }
